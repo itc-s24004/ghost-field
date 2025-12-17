@@ -1,0 +1,20 @@
+{
+	"name": "ghost-field",
+	"version": "0.0.0",
+	"description": "カードゲーム・ゴーストフィールドのサーバー・クライアントライブラリ",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"type": "module",
+	"scripts": {
+		"build": "tsc"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.6",
+		"socket.io": "^4.8.1",
+		"typescript": "^5.9.3"
+	},
+	"dependencies": {
+		"ghost-field-core": "github:itc-s24004/ghost-field-core",
+		"socket.io-client": "^4.8.1"
+	}
+}
