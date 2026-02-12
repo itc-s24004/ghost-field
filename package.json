@@ -6,7 +6,10 @@
 	"types": "dist/index.d.ts",
 	"type": "module",
 	"scripts": {
-		"build": "tsc"
+        "rebuild": "rm -rf dist && tsc",
+		"build": "tsc",
+        "test:server": "tsx src/_test/server.ts",
+        "test:client": "tsx src/_test/client.ts"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.6",
@@ -14,7 +17,7 @@
 		"typescript": "^5.9.3"
 	},
 	"dependencies": {
-		"ghost-field-core": "github:itc-s24004/ghost-field-core",
+		"ghost-field-core": "link:../ghost-field-core",
 		"socket.io-client": "^4.8.1"
 	}
 }

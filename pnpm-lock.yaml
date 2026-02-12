@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       ghost-field-core:
-        specifier: github:itc-s24004/ghost-field-core
-        version: https://codeload.github.com/itc-s24004/ghost-field-core/tar.gz/309faf3d54ae1dc657776333ae746570e2350ba2
+        specifier: link:../ghost-field-core
+        version: link:../ghost-field-core
       socket.io-client:
         specifier: ^4.8.1
         version: 4.8.1
@@ -98,10 +98,6 @@ packages:
   engine.io@6.6.4:
     resolution: {integrity: sha512-ZCkIjSYNDyGn0R6ewHDtXgns/Zre/NT6Agvq1/WobF7JXgFff4SeDroKiCO3fNJreU9YG429Sc81o4w5ok/W5g==}
     engines: {node: '>=10.2.0'}
-
-  ghost-field-core@https://codeload.github.com/itc-s24004/ghost-field-core/tar.gz/309faf3d54ae1dc657776333ae746570e2350ba2:
-    resolution: {tarball: https://codeload.github.com/itc-s24004/ghost-field-core/tar.gz/309faf3d54ae1dc657776333ae746570e2350ba2}
-    version: 0.0.0
 
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
@@ -261,8 +257,6 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
-
-  ghost-field-core@https://codeload.github.com/itc-s24004/ghost-field-core/tar.gz/309faf3d54ae1dc657776333ae746570e2350ba2: {}
 
   mime-db@1.52.0: {}
 
