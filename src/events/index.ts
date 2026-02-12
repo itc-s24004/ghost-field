@@ -82,5 +82,3 @@ export type GhostField_Server_EventDataMap<EX_Card extends GF_EX_GameData, EX_Me
     }
 
 }
-
-GF_Game.prototype.currentPlayerIndex
