@@ -13,7 +13,15 @@ const io = new IO_Server<GhostField_Client_EventMap, GhostField_Server_EventMap<
 
 const test = io.of("/test");
 
-const server = new GhostField_Server(test, GameInitData);
+const server = new GhostField_Server(test, GameInitData, {
+    autoClose: true,
+    timeout: 1000*10,// 30秒
+    onClose: () =>  {
+        io._nsps.delete("/test");
+        // io.close();
+        console.log("サーバーが閉じられました");
+    }
+});
 
 
 io.listen(5000,  {});
