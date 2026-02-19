@@ -1,76 +1,178 @@
-import { GF_Game } from "ghost-field-core";
+import { GF_Card, GF_Error, GF_Game, GF_Player } from "ghost-field-core";
 export class GhostField_Server {
     #io;
     #sockets;
     #options;
     #game;
+    #firstConnectTimeOut;
+    #ownerSocketId;
+    getPlayerSocket(player) {
+        const index = typeof player === "number" ? player : this.#game.getPlayerIndex(player);
+        return this.#sockets.values().find(socket => socket.data.bind === index);
+    }
     constructor(io, // | Server<GhostField_Client_EventMap, GhostField_Server_EventMap<EX_Card, EX_Meta>, GhostField_Client_EventMap, socketData>,
     data, options = {}) {
-        let ownerSocketId;
         const { sockets } = io;
         this.#io = io;
         this.#sockets = sockets;
         this.#options = options;
         const { timeout = 1000 * 60 * 3 } = options;
-        const initCloseTimeout = timeout === Infinity ? undefined : setTimeout(() => {
+        this.#firstConnectTimeOut = timeout === Infinity ? undefined : setTimeout(() => {
             this.close();
         }, timeout);
-        this.#game = new GF_Game(data, {
-            secureMode: true,
-            events: {
-                onDamage(ev) {
-                }
+        this.#game = new GF_Game(data);
+        this.#initGameListeners();
+        this.#initSocketListeners();
+    }
+    #initSocketListeners() {
+        this.#io.on("connection", (socket) => {
+            //タイムアウト解除
+            clearTimeout(this.#firstConnectTimeOut);
+            //接続したクライアントのソケットに初期データを設定
+            socket.data.bind = -1;
+            socket.data.name = "名無し";
+            socket.data.isOwner = false;
+            socket.data.socketId = socket.id;
+            if (!this.#ownerSocketId) { //最初の接続をオーナーにする
+                this.#ownerSocketId = socket.id;
+                socket.data.isOwner = true;
             }
-        });
-        io.on("connection", (socket) => {
-            const socketData = socket.data;
-            socketData.bind = -1;
-            socketData.name = socket.id;
-            socketData.isOwner = false;
-            //接続があったらタイムアウト解除
-            if (initCloseTimeout)
-                clearTimeout(initCloseTimeout);
-            console.log(`Client connected: ${socket.id}`);
-            if (!ownerSocketId) {
-                ownerSocketId = socket.id;
-                //ルームオーナーであることを通知
-                socket.emit("server:owner", {});
-            }
-            //初期化データを送信
+            this.#IO_PlayerList();
+            //接続したクライアントに初期化データを送信
             socket.emit("server:init", {
-                game: data,
-                players: (sockets.values().reduce((obj, socket) => { obj[socket.id] = socket.data; return obj; }, {}))
+                game: this.#game.initData,
+                currentField: this.currentField,
+                currentPlayerIndex: this.#game.currentPlayerIndex,
+                sockets: this.#game.allPlayers.map(player => player.status),
+                isPlaying: this.#game.isPlaying
             });
             socket.on("client:setName", (ev) => {
                 socket.data.name = ev.newName;
-                //全員に名前変更を通知
-                io.emit("server:setName", {
-                    socketId: socket.id,
-                    newName: ev.newName
-                });
+                this.#IO_ChangeName(socket.id, ev.newName);
             }).on("client:message", (ev) => {
-                //全員にメッセージを送信
-                io.emit("server:message", {
-                    from: socket.id,
-                    message: ev.message
-                });
-            }).on("client:start", (data) => {
-                if (socket.id !== ownerSocketId)
+                this.#IO_Message(socket.id, ev.message);
+            }).on("client:start", () => {
+                if (socket.id !== this.#ownerSocketId)
                     return;
-                this.#game.reset(this.socketCount);
-                io.emit("server:start", {}); //!!! 未実装
+                console.log("ゲームを開始します。");
+                this.#sockets.values().forEach((socket, index) => {
+                    socket.data.bind = index;
+                });
+                this.#IO_PlayerList();
+                this.#game.reset(this.#sockets.size);
+                this.#io.emit("server:start", {
+                    sockets: this.#sockets.values().map(socket => socket.data).toArray(),
+                    gamePlayers: this.#game.allPlayers.map(player => player.status)
+                });
+                this.#IO_FieldChange();
+            }).on("client:useCard", (ev) => {
+                if (!this.#game.isPlaying)
+                    return;
+                const playerIndex = socket.data.bind;
+                //行動中のプレイヤー以外からの入力は無視
+                if (playerIndex === -1 || playerIndex !== this.#game.currentPlayerIndex) {
+                    socket.disconnect();
+                    return;
+                }
+                try {
+                    const { cards, targetIndex, useOptions } = ev;
+                    this.#game.next(cards, targetIndex, useOptions);
+                }
+                catch (e) {
+                    if (e instanceof GF_Error)
+                        console.error(`Error: ${e.message}`);
+                    socket.disconnect();
+                }
             }).on("disconnect", () => {
-                if (socket.id === ownerSocketId) {
-                    const nextSocket = sockets.values().next().value;
-                    if (nextSocket) {
-                        ownerSocketId = nextSocket.id;
-                        nextSocket.emit("server:owner", {});
+                const player = this.#game.getPlayerByIndex(socket.data.bind);
+                if (player)
+                    this.#game.kill(player);
+                if (socket.id === this.#ownerSocketId) { //オーナーが抜けたとき
+                    const nextOwner = this.#sockets.values().next().value;
+                    if (nextOwner) { //次のオーナーがいるとき
+                        this.#ownerSocketId = nextOwner.data.socketId;
+                        nextOwner.data.isOwner = true;
                     }
                     else {
+                        this.#ownerSocketId = undefined;
                         this.#autoClose();
+                        return;
                     }
                 }
+                this.#IO_PlayerList();
             });
+        });
+    }
+    get currentField() {
+        const action = this.#game.currentAction;
+        if (!action)
+            return undefined;
+        return {
+            action: action.cards.map(c => c.id),
+            source: this.#game.getPlayerIndex(action.src)
+        };
+    }
+    #initGameListeners() {
+        this.#game.on("gameSystem", "onDrawCard", (data) => {
+            const socket = this.getPlayerSocket(data.player);
+            if (socket) {
+                socket.emit("server:drawCard", {
+                    card: data.drawnCard.id,
+                    removedCard: data.removedCard?.id
+                });
+            }
+        }).on("gameSystem", "onDamage", (data) => {
+            console.log(`プレイヤー${this.#game.getPlayerIndex(data.player)}が${data.damage}ダメージを受けました。`);
+            const playerIndex = this.#game.getPlayerIndex(data.player);
+            this.#IO_PlayerStatusChange(playerIndex, data.player.status);
+        }).on("gameSystem", "onHeal", (data) => {
+            const playerIndex = this.#game.getPlayerIndex(data.player);
+            this.#IO_PlayerStatusChange(playerIndex, data.player.status);
+        }).on("gameSystem", "onUseCard", (data) => {
+            const playerIndex = this.#game.getPlayerIndex(data.player);
+            this.#io.emit("server:useCard", {
+                playerIndex,
+                cards: data.cards.map(c => c.id),
+                stackCard: Object.fromEntries(data.result.stackCards.entries().map(([card, count]) => ([card.id, count])))
+            });
+        }).on("gameSystem", "onNextTurn", (data) => {
+            console.log(`プレイヤー${this.#game.currentPlayerIndex}の${this.currentField ? "防御" : "攻撃"}ターンになりました。`);
+            this.#IO_FieldChange();
+        }).on("gameSystem", "onGameEnd", (data) => {
+            console.log("ゲームが終了しました。");
+            const winnerIndex = data.winner ? this.#game.getPlayerIndex(data.winner) : -1;
+            this.#io.emit("server:end", {
+                winnerIndex
+            });
+        });
+    }
+    #IO_PlayerList() {
+        this.#io.emit("server:playerListChange", {
+            sockets: this.#sockets.values().map(socket => socket.data).toArray()
+        });
+    }
+    #IO_ChangeName(socketId, newName) {
+        this.#io.emit("server:setName", {
+            socketId,
+            newName
+        });
+    }
+    #IO_Message(socketId, message) {
+        this.#io.emit("server:message", {
+            from: socketId,
+            message
+        });
+    }
+    #IO_PlayerStatusChange(playerIndex, status) {
+        this.#io.emit("server:playerStatusChange", {
+            playerIndex,
+            status
+        });
+    }
+    #IO_FieldChange() {
+        this.#io.emit("server:fieldChange", {
+            action: this.currentField,
+            currentPlayer: this.#game.currentPlayerIndex
         });
     }
     get game() {
@@ -85,6 +187,7 @@ export class GhostField_Server {
     }
     close() {
         this.#io.removeAllListeners();
+        this.#io.sockets.forEach(socket => socket.disconnect(true));
         this.#options.onClose?.();
     }
 }

@@ -1,8 +1,43 @@
-import type { GhostField_Server_EventMap } from "../events/index.js";
-export declare class GhostField_Client {
+import type { GhostField_Message, GhostField_Server_EventDataMap } from "../events/index.js";
+import type { GhostField_CurrentField, socketData } from "../server/server.js";
+import { CategoryEventEmitter, GF_Card, GF_PlayerDeck, type GF_Card_ID, type GF_EX_GameData, type GF_PlayerStatus } from "ghost-field-core";
+import type { GF_CardMixData_Attack, GF_CardUseOptions } from "ghost-field-core/dist/util/card/index.js";
+type EX_EventMap<EX_Card extends GF_EX_GameData, EX_Meta extends GF_EX_GameData> = GhostField_Server_EventDataMap<EX_Card, EX_Meta> & {
+    "connect": {};
+    "disconnect": {};
+    "all": keyof EX_EventMap<EX_Card, EX_Meta>;
+};
+export declare class GhostField_Client<EX_Card extends GF_EX_GameData = GF_EX_GameData, EX_Meta extends GF_EX_GameData = GF_EX_GameData, EventCategory extends string = string> extends CategoryEventEmitter<EX_EventMap<EX_Card, EX_Meta>, EventCategory> {
     #private;
-    constructor(event: GhostField_Server_EventMap<{}, {}>);
+    get socketID(): string | undefined;
+    get isConnected(): boolean;
+    get currentPlayerIndex(): number;
+    get currentPlayer(): GF_PlayerStatus | undefined;
+    get allGamePlayers(): GF_PlayerStatus[];
+    get sockets(): socketData[];
+    getGamePlayerStatus(bind: number): GF_PlayerStatus | undefined;
+    getStatusBySocketID(socketID: string): socketData | undefined;
+    getStatusByBind(bind: number): socketData | undefined;
+    get state(): socketData | undefined;
+    get isPlaying(): boolean;
+    get field(): GF_CardMixData_Attack<EX_Card> | null;
+    get isMyTurn(): boolean;
+    get hp(): number;
+    get mp(): number;
+    get gold(): number;
+    get hand(): Map<GF_Card<EX_Card>, number>;
+    get magicStack(): Map<GF_Card<EX_Card>, number>;
+    get deck(): GF_PlayerDeck<EX_Card> | null;
+    canUseCard(cards: (GF_Card<EX_Card> | GF_Card_ID)[]): boolean;
+    get messages(): Readonly<GhostField_Message>[];
+    constructor();
+    emit<K extends keyof GhostField_Server_EventDataMap<EX_Card, EX_Meta> | "connect" | "disconnect" | "all">(eventName: K, data: EX_EventMap<EX_Card, EX_Meta>[K]): this;
     connect(url: URL): Promise<void>;
     disconnect(): void;
+    toSystemAction(action: GhostField_CurrentField<EX_Card> | undefined): GF_CardMixData_Attack<EX_Card> | null;
+    changeName(name: string): void;
     sendMessage(message: string): void;
+    startGame(): void;
+    useCard(cards: (GF_Card<EX_Card> | GF_Card_ID)[], targetIndex: number, useOptions?: GF_CardUseOptions): void;
 }
+export {};
