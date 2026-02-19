@@ -6,10 +6,10 @@
 	"types": "dist/index.d.ts",
 	"type": "module",
 	"scripts": {
-        "rebuild": "rm -rf dist && tsc",
+		"rebuild": "rm -rf dist && tsc",
 		"build": "tsc",
-        "test:server": "tsx src/_test/server.ts",
-        "test:client": "tsx src/_test/client.ts"
+		"test:server": "tsx src/_test/server.ts",
+		"test:client": "tsx src/_test/client.ts"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.6",
