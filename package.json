@@ -17,7 +17,7 @@
 		"typescript": "^5.9.3"
 	},
 	"dependencies": {
-		"ghost-field-core": "link:../ghost-field-core",
+		"ghost-field-core": "github:itc-s24004/ghost-field-core",
 		"socket.io-client": "^4.8.1"
 	}
 }
